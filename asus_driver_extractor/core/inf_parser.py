@@ -267,7 +267,7 @@ class InfParser:
 
                         parts = [p.strip().strip('"') for p in val.split(",")]
                         for p in parts:
-                            if any(p.upper().startswith(prefix) for prefix in ["PCI\\", "USB\\", "ACPI\\", "HDAUDIO\\"]):
+                            if p.upper().startswith(("PCI\\", "USB\\", "ACPI\\", "HDAUDIO\\")):
                                 hardware_ids.add(p)
 
         return sorted(list(device_names))[:10], sorted(list(hardware_ids))[:10], sorted(list(architectures))
