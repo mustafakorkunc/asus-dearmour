@@ -141,6 +141,7 @@ class AsusDownloader:
             "Accept": "application/json, text/plain, */*",
         }
 
+        import json
         data = None
         for url in urls:
             try:

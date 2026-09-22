@@ -5,6 +5,7 @@ Unit tests for AsusDownloader interface and hardware detection.
 import io
 import json
 import unittest
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -40,6 +41,7 @@ class TestAsusDownloader(unittest.TestCase):
         self.assertEqual(downloader.download_dir, custom_dir)
         self.assertTrue(custom_dir.is_dir())
 
+    @unittest.skipIf(os.name != 'nt', "Hardware detection relies on Windows Registry")
     def test_detect_local_system(self):
         """Test hardware detection returns valid dictionary structure."""
         info = AsusDownloader.detect_local_system()
@@ -130,6 +132,7 @@ class TestAsusDownloader(unittest.TestCase):
         self.assertEqual(result_path.read_bytes(), b"driver_bytes")
         self.assertGreaterEqual(len(progress_calls), 1)
 
+    @unittest.skipIf(os.name != 'nt', "Hardware detection relies on Windows Registry")
     def test_detect_local_system_failure_does_not_default_to_fake_model(self):
         """Test that hardware detection failure returns empty model rather than fake model."""
         with patch('winreg.OpenKey', side_effect=FileNotFoundError):

@@ -5,7 +5,7 @@ Extracts driver metadata, hardware IDs, device names, and required file dependen
 
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Dict, List, Optional, Set
 
 
@@ -277,7 +277,7 @@ class InfParser:
                 for line in lines:
                     if "=" in line:
                         filename = line.split("=")[0].strip().strip('"')
-                        base = Path(filename).name
+                        base = PureWindowsPath(filename).name
                         if base and "." in base:
                             files.add(base)
             elif "copyfiles" in sec_name or "files" in sec_name:
@@ -285,7 +285,7 @@ class InfParser:
                     parts = line.split(",")
                     for part in parts:
                         clean = part.strip().strip('"')
-                        base = Path(clean).name
+                        base = PureWindowsPath(clean).name
                         if base and "." in base:
                             files.add(base)
 
