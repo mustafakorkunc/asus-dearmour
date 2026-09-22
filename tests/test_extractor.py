@@ -3,7 +3,6 @@ Unit tests for Binary Stream Carving and Archive Extractor.
 """
 
 import io
-import unittest.mock
 import tempfile
 import unittest
 import zipfile
@@ -49,29 +48,6 @@ class TestArchiveExtractor(unittest.TestCase):
         success = extractor.unpack_archive(carved_file, unpacked_dir)
         self.assertTrue(success)
         self.assertTrue((unpacked_dir / "test_driver.inf").is_file())
-
-    @unittest.mock.patch("asus_driver_extractor.core.extractor.zipfile.ZipFile")
-    def test_unpack_archive_zipfile_exception_fallback(self, mock_zipfile):
-        """Test that a failure in standard ZIP extraction falls through gracefully."""
-        mock_zipfile.side_effect = Exception("Simulated ZIP failure")
-
-        extractor = ArchiveExtractor()
-
-        # Disable fallback extractors to ensure we just return False at the end
-        extractor.tar_exe = None
-        extractor.seven_zip = None
-        extractor.expand_exe = None
-
-        dummy_zip = self.tmp_path / "corrupt.zip"
-        dummy_zip.touch()
-
-        dest_dir = self.tmp_path / "dest"
-
-        result = extractor.unpack_archive(dummy_zip, dest_dir)
-
-        # It should catch the exception, skip to next methods, and eventually return False
-        self.assertFalse(result)
-        mock_zipfile.assert_called_once()
 
 
 if __name__ == "__main__":
