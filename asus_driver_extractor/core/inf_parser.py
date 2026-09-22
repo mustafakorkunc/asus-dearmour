@@ -44,6 +44,8 @@ class DriverMetadata:
 class InfParser:
     """Parses .inf files and categorizes Windows drivers."""
 
+    WIFI_KEYWORDS = ("wlan", "wifi", "wireless", "802.11", "wi-fi", "8852", "ax200", "ax210", "mt7921")
+
     CLASS_TO_CATEGORY: Dict[str, str] = {
         "net": "Network_Ethernet",
         "bluetooth": "Bluetooth",
@@ -145,8 +147,7 @@ class InfParser:
 
         # Check for Wi-Fi vs Ethernet if class is Net
         if cls_lower == "net":
-            wifi_keywords = ["wlan", "wifi", "wireless", "802.11", "wi-fi", "8852", "ax200", "ax210", "mt7921"]
-            if any(kw in content_lower for kw in wifi_keywords):
+            if any(kw in content_lower for kw in InfParser.WIFI_KEYWORDS):
                 return "Network_Wireless"
             return "Network_Ethernet"
 
