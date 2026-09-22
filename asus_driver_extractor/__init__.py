@@ -9,6 +9,7 @@ generate automated deployment scripts.
 :license: MIT, see LICENSE for more details.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __author__ = "mustcoffi"
 __license__ = "MIT"
+

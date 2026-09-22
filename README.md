@@ -3,11 +3,11 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d7.svg)](https://microsoft.com/windows)
-[![Release: Standalone EXE](https://img.shields.io/badge/release-v1.1.0%20(Public%20Beta)-orange.svg)](https://github.com/mustafakorkunc/asus-dearmour/releases)
-[![Tests: 21 Passed](https://img.shields.io/badge/tests-21%20passed-brightgreen.svg)](tests/)
+[![Release: Standalone EXE](https://img.shields.io/badge/release-v1.1.1%20(Public%20Beta)-orange.svg)](https://github.com/mustafakorkunc/asus-dearmour/releases)
+[![Tests: 37 Passed](https://img.shields.io/badge/tests-37%20passed-brightgreen.svg)](tests/)
 
 > [!NOTE]
-> **Active Public Beta:** DeArmour v1.1.0 is currently in public community testing across various ASUS laptop series. Feedback, model verification reports, and bug reports are warmly welcomed via [GitHub Issues](https://github.com/mustafakorkunc/asus-dearmour/issues)!
+> **Active Public Beta:** DeArmour v1.1.1 is currently in public community testing across various ASUS laptop series. Feedback, model verification reports, and bug reports are warmly welcomed via [GitHub Issues](https://github.com/mustafakorkunc/asus-dearmour/issues)!
 
 **DeArmour** is an open-source Windows driver extraction and deployment utility designed to strip installer wrappers (such as SetupLdr, Inno Setup, or AsusSetup packages) and unpack the underlying driver payloads. It features automatic hardware detection via the Windows Registry, package discovery from official ASUS Support REST API endpoints, driver organization by hardware category, and automated Windows `pnputil` deployment script generation.
 
@@ -139,7 +139,7 @@ Extracted_Drivers/
 
 The simplest way to use DeArmour is via the standalone Windows executable:
 
-1. Download **`DeArmour-v1.1.0-win64.exe`** from [Releases](https://github.com/mustafakorkunc/asus-dearmour/releases).
+1. Download **`DeArmour-v1.1.1-win64.exe`** from [Releases](https://github.com/mustafakorkunc/asus-dearmour/releases).
 2. Run the executable (no Python installation or dependencies required).
 3. Under the **ASUS Cloud Downloader** tab:
    - Click **Detect System** to auto-fill your ASUS model and OS version.
@@ -221,7 +221,7 @@ pip install pytest
 pytest tests/ -v
 ```
 
-All 21 unit tests run in zero-dependency simulated environments with mocked binary streams and INF descriptors.
+All 37 unit tests run in zero-dependency simulated environments with mocked binary streams and INF descriptors.
 
 ---
 

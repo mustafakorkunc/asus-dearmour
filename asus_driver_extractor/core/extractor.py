@@ -65,33 +65,61 @@ class ArchiveExtractor:
     def carve_embedded_archives(self, file_path: Path, output_dir: Path) -> List[Tuple[str, Path]]:
         """
         Scans a binary file for embedded archive signatures (7z, ZIP, CAB, RAR)
-        and carves out matching stream slices.
+        and carves out matching stream slices using memory mapping for efficiency.
         """
         carved_files: List[Tuple[str, Path]] = []
+        file_path = Path(file_path).resolve()
+        if not file_path.is_file():
+            return []
+
         file_size = file_path.stat().st_size
+        if file_size == 0:
+            return []
+
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         with open(file_path, "rb") as f:
-            data = f.read()
+            mm = None
+            try:
+                import mmap
+                mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+            except (ValueError, OSError):
+                mm = None
 
-        for arch_type, signature in self.MAGIC_SIGNATURES.items():
-            pos = 0
-            idx = 0
-            while True:
-                offset = data.find(signature, pos)
-                if offset == -1:
-                    break
+            try:
+                data = mm if mm is not None else f.read()
 
-                # Write carved slice
-                slice_path = output_dir / f"carved_{idx}.{arch_type}"
-                with open(slice_path, "wb") as out:
-                    out.write(data[offset:])
+                for arch_type, signature in self.MAGIC_SIGNATURES.items():
+                    pos = 0
+                    idx = 0
+                    while True:
+                        offset = data.find(signature, pos)
+                        if offset == -1:
+                            break
 
-                # Verify if the slice can be read
-                if self._verify_archive(slice_path, arch_type):
-                    carved_files.append((arch_type, slice_path))
-                    idx += 1
+                        slice_path = output_dir / f"carved_{idx}.{arch_type}"
+                        with open(slice_path, "wb") as out:
+                            chunk_size = 1024 * 1024  # 1 MB chunk streaming
+                            cur = offset
+                            while cur < file_size:
+                                end = min(cur + chunk_size, file_size)
+                                out.write(data[cur:end])
+                                cur = end
 
-                pos = offset + len(signature)
+                        # Verify if the slice can be read
+                        if self._verify_archive(slice_path, arch_type):
+                            carved_files.append((arch_type, slice_path))
+                            idx += 1
+                        else:
+                            try:
+                                slice_path.unlink()
+                            except Exception:
+                                pass
+
+                        pos = offset + len(signature)
+            finally:
+                if mm is not None:
+                    mm.close()
 
         return carved_files
 
@@ -118,8 +146,57 @@ class ArchiveExtractor:
                     creationflags=WIN_NO_WINDOW,
                 )
                 return res.returncode == 0
+            elif arch_type == "rar":
+                if self.seven_zip:
+                    res = subprocess.run(
+                        [self.seven_zip, "t", str(file_path)],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        creationflags=WIN_NO_WINDOW,
+                    )
+                    return res.returncode == 0
+                return False
+            elif arch_type == "cab" and self.expand_exe:
+                res = subprocess.run(
+                    [self.expand_exe, "-D", str(file_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    creationflags=WIN_NO_WINDOW,
+                )
+                return res.returncode == 0
         except Exception:
             return False
+        return False
+
+    @staticmethod
+    def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: Path) -> bool:
+        """
+        Safely extracts all members from a ZipFile, preventing directory traversal
+        and Zip Slip attacks (e.g. ../, /etc/passwd, C:\\Windows).
+        """
+        import re
+        dest_dir_resolved = dest_dir.resolve()
+        for member in zf.infolist():
+            raw_name = member.filename
+            # Normalize path separators
+            norm_name = raw_name.replace("\\", "/").strip()
+            # Disallow absolute paths or Windows drive letters
+            if norm_name.startswith("/") or re.match(r"^[a-zA-Z]:", norm_name):
+                raise ExtractionError(f"Unsafe path detected in archive: {raw_name}")
+
+            target_path = (dest_dir / norm_name).resolve()
+            # Ensure resolved target is within destination directory
+            if not (target_path == dest_dir_resolved or dest_dir_resolved in target_path.parents):
+                raise ExtractionError(f"Path traversal detected in archive: {raw_name}")
+
+            if member.is_dir() or norm_name.endswith("/"):
+                target_path.mkdir(parents=True, exist_ok=True)
+            else:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(member) as src, open(target_path, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
         return True
 
     def unpack_archive(self, archive_path: Path, dest_dir: Path) -> bool:
@@ -131,8 +208,9 @@ class ArchiveExtractor:
         if suffix == ".zip" or zipfile.is_zipfile(archive_path):
             try:
                 with zipfile.ZipFile(archive_path, "r") as zf:
-                    zf.extractall(dest_dir)
-                return True
+                    return self._safe_extract_zip(zf, dest_dir)
+            except ExtractionError:
+                raise
             except Exception:
                 pass
 
@@ -196,44 +274,47 @@ class ArchiveExtractor:
         carve_dir = staging_dir / "_carved"
         carve_dir.mkdir(parents=True, exist_ok=True)
 
-        extracted_any = False
+        try:
+            extracted_any = False
 
-        # 1. Carve embedded archive streams first (e.g. ASUS SetupLdr with appended 7z/CAB/ZIP)
-        carved = self.carve_embedded_archives(exe_path, carve_dir)
-        for _, carved_path in carved:
-            if self.unpack_archive(carved_path, staging_dir):
-                extracted_any = True
+            # 1. Carve embedded archive streams first (e.g. ASUS SetupLdr with appended 7z/CAB/ZIP)
+            carved = self.carve_embedded_archives(exe_path, carve_dir)
+            for _, carved_path in carved:
+                if self.unpack_archive(carved_path, staging_dir):
+                    extracted_any = True
 
-        # 2. If carving didn't find archives, try direct extraction (e.g. pure 7z/ZIP SFX)
-        if not extracted_any:
-            if self.unpack_archive(exe_path, staging_dir):
-                extracted_any = True
+            # 2. If carving didn't find archives, try direct extraction (e.g. pure 7z/ZIP SFX)
+            if not extracted_any:
+                if self.unpack_archive(exe_path, staging_dir):
+                    extracted_any = True
 
-        # 3. Fallback: Check if 7z.exe can handle the installer directly
-        if not extracted_any and self.seven_zip:
-            res = subprocess.run(
-                [self.seven_zip, "x", f"-o{staging_dir}", "-y", str(exe_path)],
-                capture_output=True,
-                text=True,
-                timeout=60,
-                creationflags=WIN_NO_WINDOW,
-            )
-            if res.returncode == 0:
-                extracted_any = True
+            # 3. Fallback: Check if 7z.exe can handle the installer directly
+            if not extracted_any and self.seven_zip:
+                res = subprocess.run(
+                    [self.seven_zip, "x", f"-o{staging_dir}", "-y", str(exe_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    creationflags=WIN_NO_WINDOW,
+                )
+                if res.returncode == 0:
+                    extracted_any = True
 
-        # Recursive pass: find any archives nested inside the extracted folder
-        self._unpack_nested_archives(staging_dir)
+            # Recursive pass: find any archives nested inside the extracted folder
+            self._unpack_nested_archives(staging_dir)
 
-        # Cleanup intermediate carve folder
-        if carve_dir.is_dir():
-            shutil.rmtree(carve_dir, ignore_errors=True)
-
-        # Return all files in staging_dir
-        return [p for p in staging_dir.rglob("*") if p.is_file()]
+            return [p for p in staging_dir.rglob("*") if p.is_file()]
+        finally:
+            # Cleanup intermediate carve folder safely
+            if carve_dir.is_dir():
+                shutil.rmtree(carve_dir, ignore_errors=True)
 
     def _unpack_nested_archives(self, directory: Path, max_depth: int = 5):
         """Recursively scans and unpacks any archives found inside unpacked contents."""
         archive_exts = {".7z", ".zip", ".cab", ".tar", ".gz", ".xz"}
+        if self.seven_zip:
+            archive_exts.add(".rar")
+
         for depth in range(max_depth):
             nested_archives = [
                 p for p in directory.rglob("*")

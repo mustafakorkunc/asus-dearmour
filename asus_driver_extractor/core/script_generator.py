@@ -87,7 +87,7 @@ Write-Host "  DeArmour - BATCH DRIVER DEPLOYMENT (PowerShell)       " -Foregroun
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host ""
 
-$infFiles = Get-ChildItem -Path $PSScriptRoot -Filter "*.inf" -Recurse
+$infFiles = Get-ChildItem -LiteralPath $PSScriptRoot -Filter "*.inf" -Recurse
 Write-Host "[*] Total discovered INF driver packages: $($infFiles.Count)" -ForegroundColor Green
 
 foreach ($inf in $infFiles) {

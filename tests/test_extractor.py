@@ -69,6 +69,60 @@ class TestArchiveExtractor(unittest.TestCase):
             self.assertFalse(result)
             mock_zipfile.assert_called_once()
 
+    def test_safe_extract_zip_rejects_path_traversal(self):
+        """Test that relative path traversal (../evil.exe) is rejected."""
+        from asus_driver_extractor.core.extractor import ExtractionError
+        extractor = ArchiveExtractor()
+
+        zip_path = self.tmp_path / "traversal.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("../../evil.exe", "malicious payload")
+
+        dest_dir = self.tmp_path / "unpacked_safe"
+        with self.assertRaises(ExtractionError):
+            extractor.unpack_archive(zip_path, dest_dir)
+
+    def test_safe_extract_zip_rejects_backslash_traversal(self):
+        """Test that Windows-style backslash traversal (..\\..\\evil.exe) is rejected."""
+        from asus_driver_extractor.core.extractor import ExtractionError
+        extractor = ArchiveExtractor()
+
+        zip_path = self.tmp_path / "win_traversal.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("..\\..\\evil.exe", "malicious payload")
+
+        dest_dir = self.tmp_path / "unpacked_safe"
+        with self.assertRaises(ExtractionError):
+            extractor.unpack_archive(zip_path, dest_dir)
+
+    def test_safe_extract_zip_rejects_absolute_path(self):
+        """Test that absolute paths are rejected."""
+        from asus_driver_extractor.core.extractor import ExtractionError
+        extractor = ArchiveExtractor()
+
+        zip_path = self.tmp_path / "abs_traversal.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("/etc/passwd", "root:x:0:0")
+
+        dest_dir = self.tmp_path / "unpacked_safe"
+        with self.assertRaises(ExtractionError):
+            extractor.unpack_archive(zip_path, dest_dir)
+
+    def test_safe_extract_zip_allows_legitimate_nested_dirs(self):
+        """Test that legitimate nested driver directory structures extract safely."""
+        extractor = ArchiveExtractor()
+
+        zip_path = self.tmp_path / "legit_nested.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("driver_pack/x64/subfolder/driver.inf", "[Version]\nClass=Net\n")
+            zf.writestr("driver_pack/x64/subfolder/driver.sys", "valid driver binary")
+
+        dest_dir = self.tmp_path / "unpacked_nested"
+        success = extractor.unpack_archive(zip_path, dest_dir)
+        self.assertTrue(success)
+        self.assertTrue((dest_dir / "driver_pack" / "x64" / "subfolder" / "driver.inf").is_file())
+        self.assertTrue((dest_dir / "driver_pack" / "x64" / "subfolder" / "driver.sys").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

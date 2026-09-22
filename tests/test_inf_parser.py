@@ -94,6 +94,89 @@ RTK = "Realtek"
         self.assertEqual(meta.category, "Bluetooth")
         self.assertEqual(meta.driver_version, "18.4028.2506.2301")
 
+    def test_inf_parser_quoted_semicolon_not_stripped(self):
+        """Test that semicolons inside quoted string values are preserved and not stripped as comments."""
+        sample_inf = """
+[Version]
+Signature="$WINDOWS NT$"
+Class=Net
+Provider="ACME; Networks Inc." ; EOL comment
+DriverVer=01/01/2026,1.0.0
+"""
+        inf_file = self.tmp_path / "quoted_semicolon.inf"
+        inf_file.write_text(sample_inf, encoding="utf-8")
+
+        meta = InfParser.parse_inf(inf_file)
+        self.assertEqual(meta.provider, "ACME; Networks Inc.")
+
+    def test_inf_parser_line_continuation(self):
+        """Test that lines ending with trailing backslash are joined properly."""
+        sample_inf = """
+[Version]
+Signature="$WINDOWS NT$"
+Class=Net
+Provider="Test"
+DriverVer=01/01/2026, \
+          2.0.0.1
+"""
+        inf_file = self.tmp_path / "continuation.inf"
+        inf_file.write_text(sample_inf, encoding="utf-8")
+
+        meta = InfParser.parse_inf(inf_file)
+        self.assertEqual(meta.driver_version, "2.0.0.1")
+
+    def test_inf_parser_decorated_strings(self):
+        """Test that decorated [Strings.0409] sections are collected and resolved."""
+        sample_inf = """
+[Version]
+Signature="$WINDOWS NT$"
+Class=Net
+Provider=%VendorName%
+DriverVer=01/01/2026,3.0.0.1
+
+[Strings.0409]
+VendorName = "Realtek Corp Decorated"
+"""
+        inf_file = self.tmp_path / "decorated_strings.inf"
+        inf_file.write_text(sample_inf, encoding="utf-8")
+
+        meta = InfParser.parse_inf(inf_file)
+        self.assertEqual(meta.provider, "Realtek Corp Decorated")
+
+    def test_inf_parser_malformed_input_recovery(self):
+        """Test that completely malformed input recovers gracefully without crashing."""
+        inf_file = self.tmp_path / "malformed.inf"
+        inf_file.write_text("random broken bytes !!! === ;;; [[[ [[not_a_valid_inf", encoding="utf-8")
+
+        meta = InfParser.parse_inf(inf_file)
+        self.assertEqual(meta.inf_name, "malformed.inf")
+        self.assertEqual(meta.provider, "Unknown")
+        self.assertEqual(meta.category, "Other")
+
+    def test_inf_associated_files_sanitization(self):
+        """Test that path prefixes are stripped from associated files and duplicates ignored."""
+        sample_inf = """
+[Version]
+Signature="$WINDOWS NT$"
+Class=Net
+
+[SourceDisksFiles]
+x64\\my_driver.sys = 1
+x86\\other_helper.dll = 1
+malformed_line_without_equals
+
+[CopyFiles]
+x64\\my_driver.sys, sub\\extra.dat
+"""
+        inf_file = self.tmp_path / "assoc_files.inf"
+        inf_file.write_text(sample_inf, encoding="utf-8")
+
+        meta = InfParser.parse_inf(inf_file)
+        self.assertIn("my_driver.sys", meta.associated_files)
+        self.assertIn("other_helper.dll", meta.associated_files)
+        self.assertIn("extra.dat", meta.associated_files)
+        self.assertNotIn("malformed_line_without_equals", meta.associated_files)
+
 
 if __name__ == "__main__":
     unittest.main()

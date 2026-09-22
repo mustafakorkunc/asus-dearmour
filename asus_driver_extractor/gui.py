@@ -401,12 +401,13 @@ class DeArmourGUI:
 
     def _apply_detected_system(self):
         info = self.detected_system
-        model = info.get("model", "FA506NC")
+        model = info.get("model", "")
         self.model_entry.delete(0, tk.END)
-        self.model_entry.insert(0, model)
+        if model:
+            self.model_entry.insert(0, model)
 
-        is_asus = info.get("is_asus", True)
-        full_name = info.get("full_name", "ASUS Device")
+        is_asus = info.get("is_asus", False)
+        full_name = info.get("full_name", "")
         os_name = info.get("os_name", "Windows 11 64-bit")
 
         if "10" in os_name:
@@ -414,9 +415,15 @@ class DeArmourGUI:
         else:
             self.os_combo.current(0)
 
-        badge = f"Hardware Detected: {full_name} ({model})  |  {os_name}"
-        self.sys_info_lbl.config(text=badge)
-        self._log(f"[+] {badge}")
+        if model:
+            badge = f"Hardware Detected: {full_name} ({model})  |  {os_name}"
+            self.sys_info_lbl.config(text=badge, fg=self.success_color)
+            self._log(f"[+] {badge}")
+        else:
+            badge = f"Hardware: Not auto-detected as ASUS | {os_name} (Please enter model code manually)"
+            self.sys_info_lbl.config(text=badge, fg=self.warning_color)
+            self._log(f"[!] {badge}")
+
         self._log(f"[*] Initialized DeArmour. Default download folder: {self.downloader.download_dir}")
 
     def _browse_file(self):
@@ -442,11 +449,17 @@ class DeArmourGUI:
             self.output_entry.insert(0, d)
 
     def _log(self, text: str):
-        self.log_text.insert(tk.END, text + "\n")
-        self.log_text.see(tk.END)
+        if threading.current_thread() is threading.main_thread():
+            self.log_text.insert(tk.END, text + "\n")
+            self.log_text.see(tk.END)
+        else:
+            self.root.after(0, self._log, text)
 
     def _set_status(self, text: str):
-        self.status_lbl.config(text=text)
+        if threading.current_thread() is threading.main_thread():
+            self.status_lbl.config(text=text)
+        else:
+            self.root.after(0, self._set_status, text)
 
     def _fetch_drivers(self):
         model = self.model_entry.get().strip().upper()
@@ -569,10 +582,10 @@ class DeArmourGUI:
 
             self._log(f"\n[+] Finished downloading {len(downloaded)} package(s) to {self.downloader.download_dir}")
             self.root.after(0, lambda: self._set_status("All selected downloads completed successfully."))
-            messagebox.showinfo("Downloads Complete", f"Successfully downloaded {len(downloaded)} driver package(s)!")
+            self.root.after(0, lambda cnt=len(downloaded): messagebox.showinfo("Downloads Complete", f"Successfully downloaded {cnt} driver package(s)!"))
         except Exception as e:
             self._log(f"[!] Download failed: {e}")
-            messagebox.showerror("Download Error", f"An error occurred during download:\n{e}")
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Download Error", f"An error occurred during download:\n{err}"))
         finally:
             self.root.after(0, lambda: self._set_busy(False))
 
@@ -595,7 +608,13 @@ class DeArmourGUI:
             self.root.after(0, lambda: self.prog.start(10))
 
             self._log("\n[*] Running DeArmour extraction engine on downloaded packages...")
-            targets = collect_target_files(self.downloader.download_dir)
+            # Strictly process ONLY packages downloaded in this current session to avoid reprocessing stale files
+            targets = [p for p in downloaded_paths if p.is_file() and p.suffix.lower() == ".exe"]
+            if not targets:
+                self._log("[!] No valid executable packages available for extraction.")
+                self.root.after(0, lambda: messagebox.showwarning("No Targets", "No executable driver packages were downloaded to process."))
+                return
+
             drivers = run_pipeline(targets, out_path)
 
             self._log("\n" + "=" * 60)
@@ -604,13 +623,16 @@ class DeArmourGUI:
             self._log(f"[+] Deployment scripts: {out_path / 'INSTALL_ALL_DRIVERS.bat'}")
 
             self.root.after(0, lambda: self._set_status(f"Pipeline complete: {len(drivers)} drivers ready for deployment."))
-            messagebox.showinfo(
-                "DeArmour Complete",
-                f"Successfully downloaded and extracted {len(drivers)} driver package(s)!\n\nOutput folder:\n{out_path}",
+            self.root.after(
+                0,
+                lambda cnt=len(drivers): messagebox.showinfo(
+                    "DeArmour Complete",
+                    f"Successfully downloaded and extracted {cnt} driver package(s)!\n\nOutput folder:\n{out_path}",
+                ),
             )
         except Exception as e:
             self._log(f"[!] Pipeline error: {e}")
-            messagebox.showerror("Pipeline Error", f"An error occurred:\n{e}")
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Pipeline Error", f"An error occurred:\n{err}"))
         finally:
             self.root.after(0, lambda: self._set_busy(False))
 
@@ -643,10 +665,10 @@ class DeArmourGUI:
             self._log("\n" + "=" * 60)
             self._log(f"[+] Complete! Total driver packages unpacked: {len(drivers)}")
             self._log(f"[+] 1-Click deployment scripts generated: {out_path / 'INSTALL_ALL_DRIVERS.bat'}")
-            messagebox.showinfo("Success", f"Successfully extracted and organized {len(drivers)} driver package(s)!")
+            self.root.after(0, lambda cnt=len(drivers): messagebox.showinfo("Success", f"Successfully extracted and organized {cnt} driver package(s)!"))
         except Exception as e:
             self._log(f"[!] Error: {e}")
-            messagebox.showerror("Error", f"An error occurred during extraction:\n{e}")
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Error", f"An error occurred during extraction:\n{err}"))
         finally:
             self.root.after(0, lambda: self._set_busy(False))
 

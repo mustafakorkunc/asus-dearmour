@@ -130,6 +130,45 @@ class TestAsusDownloader(unittest.TestCase):
         self.assertEqual(result_path.read_bytes(), b"driver_bytes")
         self.assertGreaterEqual(len(progress_calls), 1)
 
+    def test_detect_local_system_failure_does_not_default_to_fake_model(self):
+        """Test that hardware detection failure returns empty model rather than fake model."""
+        with patch('winreg.OpenKey', side_effect=FileNotFoundError):
+            info = AsusDownloader.detect_local_system()
+            self.assertEqual(info["model"], "")
+            self.assertFalse(info["is_asus"])
+
+    @patch('urllib.request.urlopen')
+    def test_download_package_cleans_up_partial_file_on_error(self, mock_urlopen):
+        """Test that a partial download is immediately deleted if the stream raises an error."""
+        mock_response = MagicMock()
+        mock_response.headers.get.return_value = "100"
+        mock_response.read.side_effect = [b"part1", ConnectionResetError("Connection lost")]
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        downloader = AsusDownloader(download_dir=self.tmp_path)
+        package = AsusDriverPackage(
+            title="Corrupted Driver",
+            category="Networking",
+            version="1.0.0",
+            release_date="2024-01-01",
+            download_url="https://dlcdnets.asus.com/pub/ASUS/fail.exe"
+        )
+
+        with self.assertRaises(ConnectionResetError):
+            downloader.download_package(package)
+
+        target_file = self.tmp_path / "fail.exe"
+        part_file = self.tmp_path / "fail.exe.part"
+        self.assertFalse(target_file.exists(), "Target file should not exist after failed download")
+        self.assertFalse(part_file.exists(), "Partial .part file should be cleaned up on failure")
+
+    def test_fetch_driver_list_empty_model(self):
+        """Test that querying with an empty model returns empty list without making requests."""
+        downloader = AsusDownloader(download_dir=self.tmp_path)
+        self.assertEqual(downloader.fetch_driver_list(""), [])
+        self.assertEqual(downloader.fetch_driver_list("   "), [])
+
 
 if __name__ == "__main__":
     unittest.main()

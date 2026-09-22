@@ -53,15 +53,16 @@ class AsusDownloader:
     def detect_local_system() -> Dict[str, Any]:
         """
         Fast, zero-dependency detection of ASUS laptop model and Windows OS version
-        via the Windows Registry.
+        via the Windows Registry. Returns an empty model string and is_asus=False
+        when hardware detection fails or when running on non-ASUS systems.
         """
         info = {
-            "model": "FA506NC",
-            "full_name": "ASUS Laptop",
-            "manufacturer": "ASUSTeK COMPUTER INC.",
+            "model": "",
+            "full_name": "Unknown",
+            "manufacturer": "Unknown",
             "os_name": "Windows 11 64-bit",
             "osid": 52,
-            "is_asus": True,
+            "is_asus": False,
         }
 
         # 1. Determine OS build and ASUS OS ID
@@ -100,11 +101,12 @@ class AsusDownloader:
 
                     if product_name:
                         info["full_name"] = product_name
+                        if not info["is_asus"] and "asus" in product_name.lower():
+                            info["is_asus"] = True
 
-                    # Best candidate for model is BaseBoardProduct (e.g. FA506NC, GA402RJ)
+                    # Primary candidate for model is BaseBoardProduct (e.g. FA506NC, GA402RJ)
                     candidate = baseboard.strip() if baseboard else product_name.strip()
-                    if candidate:
-                        # Extract core model code (e.g., 'FA506NC_FA506NC' -> 'FA506NC')
+                    if candidate and (info["is_asus"] or "asus" in candidate.lower() or baseboard):
                         parts = re.findall(r"[A-Za-z0-9]{4,10}", candidate)
                         if parts:
                             info["model"] = parts[0].upper()
@@ -210,25 +212,44 @@ class AsusDownloader:
 
         filename = package.filename
         target_path = dest_dir / filename
+        part_path = dest_dir / f"{filename}.part"
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
 
         req = urllib.request.Request(package.download_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=30) as response:
-            total_size = int(response.headers.get("content-length", 0))
-            bytes_written = 0
-            chunk_size = 64 * 1024  # 64 KB chunks
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                total_size = int(response.headers.get("content-length", 0))
+                bytes_written = 0
+                chunk_size = 64 * 1024  # 64 KB chunks
 
-            with open(target_path, "wb") as out_file:
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                    out_file.write(chunk)
-                    bytes_written += len(chunk)
-                    if progress_callback:
-                        progress_callback(bytes_written, total_size)
+                with open(part_path, "wb") as out_file:
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        out_file.write(chunk)
+                        bytes_written += len(chunk)
+                        if progress_callback:
+                            progress_callback(bytes_written, total_size)
 
-        return target_path
+            # Atomically replace target on complete download
+            if part_path.is_file():
+                if target_path.exists():
+                    try:
+                        target_path.unlink()
+                    except Exception:
+                        pass
+                part_path.replace(target_path)
+
+            return target_path
+        except Exception:
+            # Clean up partial download to avoid leaving corrupted files
+            if part_path.is_file():
+                try:
+                    part_path.unlink()
+                except Exception:
+                    pass
+            raise

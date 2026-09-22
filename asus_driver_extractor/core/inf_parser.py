@@ -97,45 +97,49 @@ class InfParser:
     def parse_inf(cls, inf_path: Path) -> DriverMetadata:
         """Parses an INF file and returns a structured DriverMetadata object."""
         inf_path = Path(inf_path)
-        content = cls.read_file_safely(inf_path)
-        sections = cls._split_sections(content)
-        strings = cls._parse_strings(sections.get("strings", []))
-
         meta = DriverMetadata(
             inf_path=inf_path,
             inf_name=inf_path.name
         )
 
-        # Parse [Version] section
-        version_lines = sections.get("version", [])
-        for line in version_lines:
-            key, val = cls._parse_key_val(line)
-            if not key:
-                continue
-            key_lower = key.lower()
-            val = cls._resolve_string(val, strings)
+        try:
+            content = cls.read_file_safely(inf_path)
+            sections = cls._split_sections(content)
+            strings = cls._collect_all_strings(sections)
 
-            if key_lower == "provider":
-                meta.provider = val.strip('"')
-            elif key_lower == "class":
-                meta.driver_class = val.strip('"')
-            elif key_lower == "catalogfile":
-                meta.catalog_file = val.strip('"')
-            elif key_lower == "driverver":
-                date_ver = [x.strip() for x in val.split(",")]
-                if date_ver:
-                    meta.driver_date = date_ver[0].strip('"')
-                if len(date_ver) > 1:
-                    meta.driver_version = date_ver[1].strip('"')
+            # Parse [Version] section
+            version_lines = sections.get("version", [])
+            for line in version_lines:
+                key, val = cls._parse_key_val(line)
+                if not key:
+                    continue
+                key_lower = key.lower()
+                val = cls._resolve_string(val, strings)
 
-        # Determine Category
-        meta.category = cls._categorize(meta.driver_class, content, strings)
+                if key_lower == "provider":
+                    meta.provider = val.strip('"').strip()
+                elif key_lower == "class":
+                    meta.driver_class = val.strip('"').strip()
+                elif key_lower == "catalogfile":
+                    meta.catalog_file = val.strip('"').strip()
+                elif key_lower == "driverver":
+                    date_ver = [x.strip() for x in val.split(",")]
+                    if date_ver:
+                        meta.driver_date = date_ver[0].strip('"').strip()
+                    if len(date_ver) > 1:
+                        meta.driver_version = date_ver[1].strip('"').strip()
 
-        # Parse Associated Files from [SourceDisksFiles] and [CopyFiles]
-        meta.associated_files = cls._find_associated_files(sections)
+            # Determine Category
+            meta.category = cls._categorize(meta.driver_class, content, strings)
 
-        # Parse Devices and Hardware IDs
-        meta.device_names, meta.hardware_ids, meta.architectures = cls._parse_devices(sections, strings)
+            # Parse Associated Files from [SourceDisksFiles] and [CopyFiles]
+            meta.associated_files = cls._find_associated_files(sections)
+
+            # Parse Devices and Hardware IDs
+            meta.device_names, meta.hardware_ids, meta.architectures = cls._parse_devices(sections, strings)
+        except Exception:
+            # Fallback to safe default metadata if input is malformed
+            pass
 
         return meta
 
@@ -166,29 +170,71 @@ class InfParser:
 
         return cls.CLASS_TO_CATEGORY.get(cls_lower, "Other")
 
+    @staticmethod
+    def _strip_comment(line: str) -> str:
+        """Strips comments (;) while respecting quoted strings."""
+        if ";" not in line:
+            return line
+        in_quotes = False
+        for i, ch in enumerate(line):
+            if ch == '"':
+                in_quotes = not in_quotes
+            elif ch == ';' and not in_quotes:
+                return line[:i]
+        return line
+
     @classmethod
     def _split_sections(cls, content: str) -> Dict[str, List[str]]:
-        """Splits an INF file into case-insensitive sections."""
+        """Splits an INF file into case-insensitive sections, handling comments and line continuations."""
         sections: Dict[str, List[str]] = {}
         current_section = None
+        pending_line = ""
 
         for raw_line in content.splitlines():
-            line = raw_line.strip()
-            # Strip comments
-            if ";" in line:
-                line = line.split(";", 1)[0].strip()
+            line = cls._strip_comment(raw_line).strip()
             if not line:
                 continue
 
             sec_match = re.match(r"^\[([a-zA-Z0-9_\-.]+)\]", line)
             if sec_match:
+                if current_section and pending_line:
+                    sections[current_section].append(pending_line.strip())
+                    pending_line = ""
                 current_section = sec_match.group(1).lower()
                 if current_section not in sections:
                     sections[current_section] = []
-            elif current_section:
+                continue
+
+            # Handle line continuation with trailing backslash
+            if line.endswith("\\"):
+                pending_line += line[:-1].rstrip() + " "
+                continue
+            else:
+                if pending_line:
+                    line = pending_line + line
+                    pending_line = ""
+
+            if current_section:
                 sections[current_section].append(line)
 
+        if current_section and pending_line:
+            sections[current_section].append(pending_line.strip())
+
         return sections
+
+    @classmethod
+    def _collect_all_strings(cls, sections: Dict[str, List[str]]) -> Dict[str, str]:
+        """Collects strings from [Strings] and decorated [Strings.<lang>] sections."""
+        combined_strings: Dict[str, str] = {}
+        if "strings" in sections:
+            combined_strings.update(cls._parse_strings(sections["strings"]))
+        for sec_name, lines in sections.items():
+            if sec_name.startswith("strings."):
+                dec = cls._parse_strings(lines)
+                for k, v in dec.items():
+                    if k not in combined_strings:
+                        combined_strings[k] = v
+        return combined_strings
 
     @classmethod
     def _parse_strings(cls, string_lines: List[str]) -> Dict[str, str]:
@@ -216,7 +262,9 @@ class InfParser:
     def _parse_key_val(cls, line: str):
         if "=" in line:
             parts = line.split("=", 1)
-            return parts[0].strip(), parts[1].strip()
+            key = parts[0].strip().strip('"').strip()
+            val = parts[1].strip()
+            return key, val
         return None, None
 
     @classmethod
@@ -227,18 +275,21 @@ class InfParser:
         for sec_name, lines in sections.items():
             if "sourcedisksfiles" in sec_name:
                 for line in lines:
-                    filename = line.split("=")[0].strip().strip('"')
-                    if filename:
-                        files.add(filename)
+                    if "=" in line:
+                        filename = line.split("=")[0].strip().strip('"')
+                        base = Path(filename).name
+                        if base and "." in base:
+                            files.add(base)
             elif "copyfiles" in sec_name or "files" in sec_name:
                 for line in lines:
                     parts = line.split(",")
                     for part in parts:
                         clean = part.strip().strip('"')
-                        if clean and "." in clean:
-                            files.add(clean)
+                        base = Path(clean).name
+                        if base and "." in base:
+                            files.add(base)
 
-        return sorted(list(files))
+        return sorted(list(files), key=str.lower)
 
     @classmethod
     def _parse_devices(cls, sections: Dict[str, List[str]], strings: Dict[str, str]):

@@ -178,7 +178,7 @@ def main():
         print(f"\n{Colors.BOLD}{Colors.CYAN}Hardware Detection:{Colors.RESET}")
         print(f"  Manufacturer:  {info['manufacturer']}")
         print(f"  Product Name:  {info['full_name']}")
-        print(f"  Model Code:    {info['model']}")
+        print(f"  Model Code:    {info['model'] or 'Not detected'}")
         print(f"  Operating Sys: {info['os_name']} (ASUS OSID: {info['osid']})")
         print(f"  ASUS Device:   {'Yes' if info['is_asus'] else 'No'}\n")
         return
@@ -191,6 +191,10 @@ def main():
             info = downloader.detect_local_system()
             target_model = info["model"]
             osid = info["osid"]
+            if not target_model:
+                print(f"{Colors.RED}[!] Could not automatically detect an ASUS model on this system.{Colors.RESET}")
+                print(f"    Please specify your model code manually (e.g. dearmour --fetch GA402RJ).")
+                return
             print(f"[*] Auto-detected Model: {target_model} ({info['os_name']})")
         else:
             target_model = args.fetch.strip().upper()

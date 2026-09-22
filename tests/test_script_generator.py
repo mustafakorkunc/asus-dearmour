@@ -98,5 +98,25 @@ class TestMasterScriptGenerator(unittest.TestCase):
         self.assertEqual(drivers[1]["category"], "Audio")
         self.assertEqual(drivers[1]["driver_version"], "2.0.0.1")
 
+    def test_generate_scripts_handles_spaces_and_special_chars_in_path(self):
+        """Test script generation when output path has spaces and brackets."""
+        special_dir = self.output_root / "Driver Packages [ASUS ROG] 2026"
+        special_dir.mkdir(parents=True, exist_ok=True)
+
+        MasterScriptGenerator.generate_scripts(special_dir, self.mock_drivers)
+
+        bat_file = special_dir / "INSTALL_ALL_DRIVERS.bat"
+        ps1_file = special_dir / "INSTALL_ALL_DRIVERS.ps1"
+        catalog_file = special_dir / "drivers_catalog.json"
+
+        self.assertTrue(bat_file.exists())
+        self.assertTrue(ps1_file.exists())
+        self.assertTrue(catalog_file.exists())
+
+        ps1_content = ps1_file.read_text(encoding="utf-8")
+        self.assertIn("-LiteralPath $PSScriptRoot", ps1_content)
+        self.assertIn('pnputil -ArgumentList "/add-driver `"$($inf.FullName)`" /install"', ps1_content)
+
+
 if __name__ == "__main__":
     unittest.main()
