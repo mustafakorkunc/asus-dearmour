@@ -152,7 +152,7 @@ class DeArmourGUI:
         self._build_local_tab()
 
         # 3. Status & Progress Indicator
-        status_frame = tk.Frame(self.root, bg=self.bg_color, padx=20, pady=(6, 2))
+        status_frame = tk.Frame(self.root, bg=self.bg_color, padx=20, pady=6)
         status_frame.pack(fill=tk.X)
 
         self.status_lbl = tk.Label(
