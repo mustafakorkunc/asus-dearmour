@@ -6,7 +6,7 @@ Extracts driver metadata, hardware IDs, device names, and required file dependen
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 @dataclass
@@ -25,7 +25,7 @@ class DriverMetadata:
     associated_files: List[str] = field(default_factory=list)
     architectures: List[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "inf_name": self.inf_name,
             "provider": self.provider,
