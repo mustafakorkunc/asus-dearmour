@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d7.svg)](https://microsoft.com/windows)
 [![Release: Standalone EXE](https://img.shields.io/badge/release-v1.1.1%20(Public%20Beta)-orange.svg)](https://github.com/mustafakorkunc/asus-dearmour/releases)
-[![Tests: 37 Passed](https://img.shields.io/badge/tests-37%20passed-brightgreen.svg)](tests/)
+[![Tests: 39 Passed](https://img.shields.io/badge/tests-39%20passed-brightgreen.svg)](tests/)
 
 > [!NOTE]
 > **Active Public Beta:** DeArmour v1.1.1 is currently in public community testing across various ASUS laptop series. Feedback, model verification reports, and bug reports are warmly welcomed via [GitHub Issues](https://github.com/mustafakorkunc/asus-dearmour/issues)!
@@ -221,7 +221,7 @@ pip install pytest
 pytest tests/ -v
 ```
 
-All 37 unit tests run in zero-dependency simulated environments with mocked binary streams and INF descriptors.
+All 39 unit tests run in zero-dependency simulated environments with mocked binary streams and INF descriptors.
 
 ---
 
