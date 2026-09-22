@@ -88,13 +88,13 @@ class DriverOrganizer:
         script_path = folder / "install.bat"
         content = f"""@echo off
 chcp 65001 >nul
-title Sürücü Kurulumu - {meta.inf_name}
+title Driver Installation - {meta.inf_name}
 cd /d "%~dp0"
 
 echo ========================================================
-echo   Sürücü Kurulumu: {meta.inf_name}
-echo   Sağlayıcı: {meta.provider}
-echo   Sürüm: {meta.driver_version or 'Bilinmiyor'} ({meta.driver_date or ''})
+echo   Installing Driver: {meta.inf_name}
+echo   Provider: {meta.provider}
+echo   Version: {meta.driver_version or 'Unknown'} ({meta.driver_date or ''})
 echo ========================================================
 echo.
 
@@ -103,11 +103,11 @@ set ERR=%errorlevel%
 
 echo.
 if %ERR% equ 0 (
-    echo [OK] Sürücü başarıyla yüklendi!
+    echo [OK] Driver installed successfully!
 ) else if %ERR% equ 3010 (
-    echo [OK] Sürücü başarıyla yüklendi (Bilgisayarın yeniden başlatılması gerekiyor).
+    echo [OK] Driver installed successfully (System reboot required).
 ) else (
-    echo [HATA] Sürücü kurulumunda hata kodu oluştu: %ERR%
+    echo [ERROR] Driver installation failed with error code: %ERR%
 )
 echo.
 pause
@@ -120,12 +120,12 @@ pause
         script_path = folder / "uninstall.bat"
         content = f"""@echo off
 chcp 65001 >nul
-title Sürücü Kaldırma - {meta.inf_name}
+title Driver Removal - {meta.inf_name}
 cd /d "%~dp0"
 
-echo [*] {meta.inf_name} ile ilişkili sürücüler aranıyor ve kaldırılıyor...
+echo [*] Removing driver package {meta.inf_name} from Windows Driver Store...
 pnputil /delete-driver {meta.inf_name} /uninstall /force
-echo [*] Tamamlandı. Hata kodu: %errorlevel%
+echo [*] Operation completed. Exit code: %errorlevel%
 pause
 """
         with open(script_path, "w", encoding="utf-8") as f:
