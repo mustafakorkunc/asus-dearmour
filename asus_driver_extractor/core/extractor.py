@@ -46,14 +46,11 @@ class ArchiveExtractor:
         system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / tool_name
         if system32.is_file():
             return str(system32)
-        shutil_path = shutil.which(tool_name)
-        return shutil_path if shutil_path else None
+        return None
 
     @staticmethod
     def _find_seven_zip() -> Optional[str]:
         candidates = [
-            shutil.which("7z"),
-            shutil.which("7za"),
             r"C:\Program Files\7-Zip\7z.exe",
             r"C:\Program Files (x86)\7-Zip\7z.exe",
         ]

@@ -5,6 +5,7 @@ Unit tests for Binary Stream Carving and Archive Extractor.
 import io
 import tempfile
 import unittest
+import unittest.mock
 import zipfile
 from pathlib import Path
 from asus_driver_extractor.core.extractor import ArchiveExtractor
@@ -122,6 +123,32 @@ class TestArchiveExtractor(unittest.TestCase):
         self.assertTrue(success)
         self.assertTrue((dest_dir / "driver_pack" / "x64" / "subfolder" / "driver.inf").is_file())
         self.assertTrue((dest_dir / "driver_pack" / "x64" / "subfolder" / "driver.sys").is_file())
+
+    @unittest.mock.patch("shutil.which")
+    def test_find_system_tool_does_not_use_path(self, mock_which):
+        """Test that finding system tools does not fall back to PATH via shutil.which."""
+        mock_which.return_value = "malicious_path"
+
+        result = ArchiveExtractor._find_system_tool("nonexistent_tool.exe")
+
+        # Verify it returns None since it shouldn't exist in System32
+        self.assertIsNone(result)
+        # Verify shutil.which was not called
+        mock_which.assert_not_called()
+
+    @unittest.mock.patch("asus_driver_extractor.core.extractor.Path.is_file")
+    @unittest.mock.patch("shutil.which")
+    def test_find_seven_zip_does_not_use_path(self, mock_which, mock_is_file):
+        """Test that finding 7-zip does not check PATH via shutil.which."""
+        mock_which.return_value = "malicious_path"
+        mock_is_file.return_value = False
+
+        # In a test environment, mock these absolute paths to not exist, so it should return None
+        result = ArchiveExtractor._find_seven_zip()
+
+        self.assertIsNone(result)
+        # Verify shutil.which was not called
+        mock_which.assert_not_called()
 
 
 if __name__ == "__main__":
