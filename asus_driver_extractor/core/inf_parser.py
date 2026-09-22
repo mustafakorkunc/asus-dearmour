@@ -257,7 +257,7 @@ class InfParser:
 
         # Inspect model sections
         for sec_name, lines in sections.items():
-            if any(sec_name.startswith(m) for m in ["mfg", "models", "realtek", "nvidia", "amd", "intel"]) or "nt" in sec_name:
+            if sec_name.startswith(("mfg", "models", "realtek", "nvidia", "amd", "intel")) or "nt" in sec_name:
                 for line in lines:
                     key, val = cls._parse_key_val(line)
                     if key and val:
