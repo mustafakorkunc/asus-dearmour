@@ -13,7 +13,7 @@ import os
 import sys
 import threading
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -406,7 +406,6 @@ class DeArmourGUI:
         if model:
             self.model_entry.insert(0, model)
 
-        is_asus = info.get("is_asus", False)
         full_name = info.get("full_name", "")
         os_name = info.get("os_name", "Windows 11 64-bit")
 
@@ -484,8 +483,8 @@ class DeArmourGUI:
             self.fetched_packages = packages
             self.root.after(0, self._render_fetched_packages)
         except Exception as e:
-            self.root.after(0, lambda: self._log(f"[!] Error fetching drivers: {e}"))
-            self.root.after(0, lambda: messagebox.showerror("Fetch Failed", f"Could not retrieve drivers from ASUS:\n{e}"))
+            self.root.after(0, lambda err=str(e): self._log(f"[!] Error fetching drivers: {err}"))
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Fetch Failed", f"Could not retrieve drivers from ASUS:\n{err}"))
         finally:
             self.root.after(0, lambda: self.fetch_btn.config(state=tk.NORMAL))
             self.root.after(0, self.prog.stop)
@@ -700,7 +699,7 @@ class DeArmourGUI:
 
 def launch_gui():
     root = tk.Tk()
-    app = DeArmourGUI(root)
+    DeArmourGUI(root)
     root.mainloop()
 
 
