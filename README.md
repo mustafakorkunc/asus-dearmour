@@ -137,6 +137,9 @@ pytest tests/ -v
 
 ---
 
-## 📄 License
+## 📄 License & Credits
 
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
+
+Crafted by **[Mustafa Korkunç](https://github.com/mustafakorkunc)** in collaboration with **Antigravity AI** pair programming. Performance optimizations and expanded unit test coverage contributed in collaboration with **Google Jules**.
+
