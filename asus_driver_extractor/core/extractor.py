@@ -43,7 +43,9 @@ class ArchiveExtractor:
 
     @staticmethod
     def _find_system_tool(tool_name: str) -> Optional[str]:
-        system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / tool_name
+        # Use hardcoded path instead of os.environ.get("SystemRoot") to prevent
+        # execution of malicious binaries if the environment variable is compromised.
+        system32 = Path(r"C:\Windows\System32") / tool_name
         if system32.is_file():
             return str(system32)
         return None
