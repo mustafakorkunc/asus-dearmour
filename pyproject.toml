@@ -3,11 +3,11 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "asus-driver-extractor"
+name = "asus-dearmour"
 version = "1.0.0"
-description = "Extracts raw INF/SYS/CAT drivers from ASUS installer executables, categorizes them, and generates clean deployment scripts."
+description = "Strip bloated ASUS driver installer wrappers into pure, bare-metal INF/SYS/CAT driver repositories with zero telemetry and 1-click batch deployment."
 readme = "README.md"
-authors = [{ name = "mustcoffi" }]
+authors = [{ name = "mustafakorkunc" }]
 license = { text = "MIT" }
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: System :: Hardware :: Hardware Drivers",
     "Topic :: Utilities"
 ]
-keywords = ["asus", "driver", "extractor", "inf", "pnputil", "clean-install", "tuf", "rog"]
+keywords = ["asus", "driver", "extractor", "inf", "pnputil", "clean-install", "tuf", "rog", "dearmour"]
 requires-python = ">=3.8"
 dependencies = []
 
@@ -35,11 +35,17 @@ dependencies = []
 dev = ["pytest>=7.0.0"]
 
 [project.scripts]
+dearmour = "asus_driver_extractor.cli:main"
+dearmour-gui = "asus_driver_extractor.gui:launch_gui"
 asus-unpack = "asus_driver_extractor.cli:main"
 ade = "asus_driver_extractor.cli:main"
 ade-gui = "asus_driver_extractor.gui:launch_gui"
 
 [project.urls]
-Homepage = "https://github.com/mustcoffi/asus-driver-extractor"
-Issues = "https://github.com/mustcoffi/asus-driver-extractor/issues"
-Repository = "https://github.com/mustcoffi/asus-driver-extractor.git"
+Homepage = "https://github.com/mustafakorkunc/asus-dearmour"
+Issues = "https://github.com/mustafakorkunc/asus-dearmour/issues"
+Repository = "https://github.com/mustafakorkunc/asus-dearmour.git"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
