@@ -13,7 +13,6 @@ import os
 import platform
 import re
 import sys
-import urllib.request
 import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable
