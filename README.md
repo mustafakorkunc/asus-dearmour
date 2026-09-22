@@ -7,6 +7,10 @@
 
 DeArmour is a lightweight, high-performance Windows driver utility designed to strip bloated ASUS installer wrappers (SetupLdr, Inno Setup, AsusSetup) into pure, bare-metal INF/SYS/CAT driver repositories. It features automatic hardware detection, direct cloud driver downloading from official ASUS servers, and 1-click batch deployment scripts with zero background telemetry services.
 
+<p align="center">
+  <img src="assets/dearmour-ui.png" alt="DeArmour v1.1.0 User Interface" width="760" />
+</p>
+
 ---
 
 ## Key Capabilities
