@@ -153,12 +153,62 @@ def main():
         help="Launch the graphical user interface (GUI)."
     )
     parser.add_argument(
+        "--detect",
+        action="store_true",
+        help="Detect local ASUS system hardware model and Windows OS architecture.",
+    )
+    parser.add_argument(
+        "--fetch",
+        nargs="?",
+        const="auto",
+        help="Query official ASUS Support REST API for drivers (e.g. --fetch FA506NC or --fetch for auto-detected model).",
+    )
+    parser.add_argument(
         "-v", "--version",
         action="version",
         version=f"DeArmour v{__version__}"
     )
 
     args = parser.parse_args()
+
+    # Hardware detection
+    if args.detect:
+        from asus_driver_extractor.core.asus_downloader import AsusDownloader
+        info = AsusDownloader.detect_local_system()
+        print(f"\n{Colors.BOLD}{Colors.CYAN}Hardware Detection:{Colors.RESET}")
+        print(f"  Manufacturer:  {info['manufacturer']}")
+        print(f"  Product Name:  {info['full_name']}")
+        print(f"  Model Code:    {info['model']}")
+        print(f"  Operating Sys: {info['os_name']} (ASUS OSID: {info['osid']})")
+        print(f"  ASUS Device:   {'Yes' if info['is_asus'] else 'No'}\n")
+        return
+
+    # Driver catalog query
+    if args.fetch:
+        from asus_driver_extractor.core.asus_downloader import AsusDownloader
+        downloader = AsusDownloader()
+        if args.fetch == "auto":
+            info = downloader.detect_local_system()
+            target_model = info["model"]
+            osid = info["osid"]
+            print(f"[*] Auto-detected Model: {target_model} ({info['os_name']})")
+        else:
+            target_model = args.fetch.strip().upper()
+            osid = 52
+
+        print(f"[*] Querying ASUS Support REST API for model '{target_model}'...")
+        packages = downloader.fetch_driver_list(target_model, osid=osid)
+        if not packages:
+            print(f"{Colors.YELLOW}[!] No packages returned for model '{target_model}'.{Colors.RESET}")
+            return
+
+        print(f"\n{Colors.BOLD}{'Category':<18} | {'Title':<35} | {'Version':<18} | {'Size':<10}{Colors.RESET}")
+        print("-" * 90)
+        for p in packages:
+            print(f"{p.category[:18]:<18} | {p.title[:35]:<35} | {p.version[:18]:<18} | {(p.file_size or 'N/A')[:10]:<10}")
+        print("-" * 90)
+        print(f"{Colors.GREEN}Found {len(packages)} official driver package(s) available on ASUS CDN.{Colors.RESET}\n")
+        return
 
     if args.gui or (args.input is None and len(sys.argv) == 1):
         try:
@@ -170,6 +220,10 @@ def main():
             sys.exit(1)
 
     print_banner()
+
+    if not args.input:
+        parser.print_help()
+        sys.exit(0)
 
     input_path = Path(args.input)
     if not input_path.exists():

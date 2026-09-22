@@ -17,6 +17,11 @@ class ExtractionError(Exception):
     pass
 
 
+# Windows flag to suppress flashing black command prompt windows
+WIN_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+
+
+
 class ArchiveExtractor:
     """
     Handles carving embedded archives out of PE files and unpacking
@@ -101,6 +106,7 @@ class ArchiveExtractor:
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    creationflags=WIN_NO_WINDOW,
                 )
                 return res.returncode == 0
             elif arch_type == "7z" and self.seven_zip:
@@ -109,6 +115,7 @@ class ArchiveExtractor:
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    creationflags=WIN_NO_WINDOW,
                 )
                 return res.returncode == 0
         except Exception:
@@ -137,6 +144,7 @@ class ArchiveExtractor:
                     capture_output=True,
                     text=True,
                     timeout=60,
+                    creationflags=WIN_NO_WINDOW,
                 )
                 if res.returncode == 0:
                     return True
@@ -151,6 +159,7 @@ class ArchiveExtractor:
                     capture_output=True,
                     text=True,
                     timeout=60,
+                    creationflags=WIN_NO_WINDOW,
                 )
                 if res.returncode == 0:
                     return True
@@ -165,6 +174,7 @@ class ArchiveExtractor:
                     capture_output=True,
                     text=True,
                     timeout=60,
+                    creationflags=WIN_NO_WINDOW,
                 )
                 if res.returncode == 0:
                     return True
@@ -206,17 +216,10 @@ class ArchiveExtractor:
                 capture_output=True,
                 text=True,
                 timeout=60,
+                creationflags=WIN_NO_WINDOW,
             )
             if res.returncode == 0:
                 extracted_any = True
-                res = subprocess.run(
-                    [self.seven_zip, "x", f"-o{staging_dir}", "-y", str(exe_path)],
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                )
-                if res.returncode == 0:
-                    extracted_any = True
 
         # Recursive pass: find any archives nested inside the extracted folder
         self._unpack_nested_archives(staging_dir)
