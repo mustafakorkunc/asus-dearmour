@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict
 
 
 class ExtractionError(Exception):
