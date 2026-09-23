@@ -1147,9 +1147,27 @@ class DeArmourGUI:
             return
         packages = [self.package_map[iid] for iid in selected_ids if iid in self.package_map]
 
-        out_dir = Path.home() / "Desktop" / "Extracted_Drivers"
+        out_dir = (Path.home() / "Desktop" / "Extracted_Drivers").resolve()
+        if out_dir.exists() and any(out_dir.iterdir()):
+            ans = messagebox.askyesnocancel(
+                "Output Directory Not Empty",
+                f"The output directory already contains files from a previous run:\n{out_dir}\n\n"
+                "Do you want to clean it before extracting?\n\n"
+                "• Yes: Clean & Overwrite (Recommended to avoid mixing drivers)\n"
+                "• No: Merge with existing files\n"
+                "• Cancel: Abort operation",
+            )
+            if ans is None:
+                self._log("[!] Operation cancelled by user.")
+                return
+            overwrite = (ans is True)
+            merge = (ans is False)
+        else:
+            overwrite = False
+            merge = False
+
         self._set_busy(True)
-        threading.Thread(target=self._worker_cloud_pipeline, args=(packages, out_dir), daemon=True).start()
+        threading.Thread(target=self._worker_cloud_pipeline, args=(packages, out_dir, overwrite, merge), daemon=True).start()
 
     def _worker_download_only(self, packages: List[AsusDriverPackage]):
         try:
@@ -1175,7 +1193,13 @@ class DeArmourGUI:
         finally:
             self.root.after(0, lambda: self._set_busy(False))
 
-    def _worker_cloud_pipeline(self, packages: List[AsusDriverPackage], out_path: Path):
+    def _worker_cloud_pipeline(
+        self,
+        packages: List[AsusDriverPackage],
+        out_path: Path,
+        overwrite: bool = False,
+        merge: bool = False,
+    ):
         try:
             total = len(packages)
             self._log(f"\n[*] Starting Cloud DeArmour Pipeline for {total} package(s)...")
@@ -1201,7 +1225,7 @@ class DeArmourGUI:
                 self.root.after(0, lambda: messagebox.showwarning("No Targets", "No executable driver packages were downloaded to process."))
                 return
 
-            drivers = run_pipeline(targets, out_path)
+            drivers = run_pipeline(targets, out_path, overwrite=overwrite, merge=merge)
 
             self._log("\n" + "=" * 60)
             self._log(f"[+] Success! {len(drivers)} driver package(s) unpacked and categorized into:")
@@ -1234,20 +1258,49 @@ class DeArmourGUI:
             out = str(Path(inp).parent / "Extracted_Drivers" if Path(inp).is_file() else Path(inp) / "Extracted_Drivers")
             self.output_entry.insert(0, out)
 
+        out_path = Path(out).resolve()
+        if out_path.exists() and any(out_path.iterdir()):
+            ans = messagebox.askyesnocancel(
+                "Output Directory Not Empty",
+                f"The output directory already contains files from a previous run:\n{out_path}\n\n"
+                "Do you want to clean it before extracting?\n\n"
+                "• Yes: Clean & Overwrite (Recommended to avoid mixing drivers)\n"
+                "• No: Merge with existing files\n"
+                "• Cancel: Abort operation",
+            )
+            if ans is None:
+                self._log("[!] Operation cancelled by user.")
+                return
+            overwrite = (ans is True)
+            merge = (ans is False)
+        else:
+            overwrite = False
+            merge = False
+
         self._set_busy(True)
         self.prog.config(mode="indeterminate")
         self.prog.start(10)
         self.log_text.delete(1.0, tk.END)
         self._log(f"[*] Local Extraction Started: {inp}")
 
-        threading.Thread(target=self._worker_local_extraction, args=(Path(inp), Path(out)), daemon=True).start()
+        threading.Thread(
+            target=self._worker_local_extraction,
+            args=(Path(inp), out_path, overwrite, merge),
+            daemon=True,
+        ).start()
 
-    def _worker_local_extraction(self, in_path: Path, out_path: Path):
+    def _worker_local_extraction(
+        self,
+        in_path: Path,
+        out_path: Path,
+        overwrite: bool = False,
+        merge: bool = False,
+    ):
         try:
             targets = collect_target_files(in_path)
             self._log(f"[*] Found installer target(s): {len(targets)}")
 
-            drivers = run_pipeline(targets, out_path)
+            drivers = run_pipeline(targets, out_path, overwrite=overwrite, merge=merge)
             self._log("\n" + "=" * 60)
             self._log(f"[+] Complete! Total driver packages unpacked: {len(drivers)}")
             self._log(f"[+] 1-Click deployment scripts generated: {out_path / 'INSTALL_ALL_DRIVERS.bat'}")

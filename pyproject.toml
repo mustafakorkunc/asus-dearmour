@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asus-dearmour"
-version = "1.1.1"
+version = "1.1.2"
 description = "Strip bloated ASUS driver installer wrappers into pure, bare-metal INF/SYS/CAT driver repositories with zero telemetry and 1-click batch deployment."
 readme = "README.md"
 authors = [{ name = "mustafakorkunc" }]

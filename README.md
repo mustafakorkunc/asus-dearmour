@@ -3,11 +3,11 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d7.svg)](https://microsoft.com/windows)
-[![Release: Standalone EXE](https://img.shields.io/badge/release-v1.1.1%20(Public%20Beta)-orange.svg)](https://github.com/mustafakorkunc/asus-dearmour/releases)
-[![Tests: 42 Passed](https://img.shields.io/badge/tests-42%20passed-brightgreen.svg)](tests/)
+[![Release: Standalone EXE](https://img.shields.io/badge/release-v1.1.2%20(Public%20Beta)-orange.svg)](https://github.com/mustafakorkunc/asus-dearmour/releases)
+[![Tests: 48 Passed](https://img.shields.io/badge/tests-48%20passed-brightgreen.svg)](tests/)
 
 > [!NOTE]
-> **Active Public Beta:** DeArmour v1.1.1 is currently in public community testing across various ASUS laptop series. Feedback, model verification reports, and bug reports are warmly welcomed via [GitHub Issues](https://github.com/mustafakorkunc/asus-dearmour/issues)!
+> **Active Public Beta:** DeArmour v1.1.2 is currently in public community testing across various ASUS laptop series. Feedback, model verification reports, and bug reports are warmly welcomed via [GitHub Issues](https://github.com/mustafakorkunc/asus-dearmour/issues)!
 
 **DeArmour** is an open-source Windows driver extraction and deployment utility designed to strip installer wrappers (such as SetupLdr, Inno Setup, or AsusSetup packages) and unpack the underlying driver payloads. It features automatic hardware detection via the Windows Registry, package discovery from official ASUS Support REST API endpoints, driver organization by hardware category, and automated Windows `pnputil` deployment script generation.
 

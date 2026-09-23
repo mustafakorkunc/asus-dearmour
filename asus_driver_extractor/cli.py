@@ -5,6 +5,8 @@ and automated script generation.
 """
 
 import argparse
+import os
+import shutil
 import sys
 import tempfile
 import time
@@ -64,8 +66,50 @@ def collect_target_files(input_path: Path, recursive: bool = False) -> List[Path
     return []
 
 
-def run_pipeline(targets: List[Path], output_dir: Path) -> List[DriverMetadata]:
+def clean_output_directory(output_dir: Path):
+    """Safely removes all contents inside the output directory without deleting the directory itself."""
+    output_dir = Path(output_dir).resolve()
+    # Safety checks against system or root directories
+    protected = {
+        Path.home().resolve(),
+        Path(Path.home().anchor).resolve(),
+    }
+    for sys_var in ("SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)"):
+        val = os.environ.get(sys_var)
+        if val:
+            protected.add(Path(val).resolve())
+
+    if output_dir in protected or output_dir.parent == output_dir:
+        raise ValueError(f"Refusing to clean protected system or root directory: {output_dir}")
+
+    for item in output_dir.iterdir():
+        if item.is_file() or item.is_symlink():
+            try:
+                item.unlink()
+            except Exception:
+                pass
+        elif item.is_dir():
+            shutil.rmtree(item, ignore_errors=True)
+
+
+def run_pipeline(
+    targets: List[Path],
+    output_dir: Path,
+    overwrite: bool = False,
+    merge: bool = False,
+) -> List[DriverMetadata]:
     """Executes the extraction and categorization pipeline on all targets."""
+    output_dir = Path(output_dir).resolve()
+
+    if output_dir.exists() and any(output_dir.iterdir()):
+        if overwrite:
+            clean_output_directory(output_dir)
+        elif not merge:
+            raise FileExistsError(
+                f"Output directory '{output_dir}' is not empty. Pass overwrite=True or merge=True to proceed."
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
     extractor = ArchiveExtractor()
     organizer = DriverOrganizer(output_dir)
     all_drivers: List[DriverMetadata] = []
@@ -164,6 +208,16 @@ def main():
         help="Query official ASUS Support REST API for drivers (e.g. --fetch FA506NC or --fetch for auto-detected model).",
     )
     parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite and clean the output directory if it already contains files.",
+    )
+    parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Allow merging extracted drivers into an existing non-empty output directory.",
+    )
+    parser.add_argument(
         "-v", "--version",
         action="version",
         version=f"DeArmour v{__version__}"
@@ -241,15 +295,36 @@ def main():
 
     # Output directory
     if args.output:
-        out_dir = Path(args.output)
+        out_dir = Path(args.output).resolve()
     elif input_path.is_dir():
-        out_dir = input_path / "Extracted_Drivers"
+        out_dir = (input_path / "Extracted_Drivers").resolve()
     else:
-        out_dir = input_path.parent / "Extracted_Drivers"
+        out_dir = (input_path.parent / "Extracted_Drivers").resolve()
+
+    if out_dir.exists() and any(out_dir.iterdir()):
+        if args.overwrite and args.merge:
+            print(f"{Colors.RED}[ERROR] Cannot specify both --overwrite and --merge simultaneously.{Colors.RESET}")
+            sys.exit(1)
+        elif args.overwrite:
+            print(f"{Colors.YELLOW}[*] Output directory is not empty. Cleaning directory contents (--overwrite)...{Colors.RESET}")
+        elif args.merge:
+            print(f"{Colors.YELLOW}[!] Output directory is not empty. Merging with existing contents (--merge).{Colors.RESET}")
+        else:
+            print(f"\n{Colors.RED}{Colors.BOLD}[ERROR] Output directory already exists and is not empty:{Colors.RESET}")
+            print(f"        {out_dir}\n")
+            print(f"{Colors.YELLOW}Why this is refused:{Colors.RESET}")
+            print(f"  DeArmour generates batch installer scripts (INSTALL_ALL_DRIVERS.bat) that deploy")
+            print(f"  all discovered drivers. Silently mixing extractions from different laptop models")
+            print(f"  or versions risks deploying incorrect or incompatible drivers.\n")
+            print(f"{Colors.BOLD}How to proceed:{Colors.RESET}")
+            print(f"  - Use {Colors.GREEN}--overwrite{Colors.RESET} to wipe the destination directory before extracting.")
+            print(f"  - Use {Colors.GREEN}--merge{Colors.RESET} to explicitly allow merging into the existing directory.")
+            print(f"  - Or specify an alternate folder with {Colors.GREEN}-o <NEW_DIR>{Colors.RESET}.\n")
+            sys.exit(1)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    drivers = run_pipeline(targets, out_dir)
+    drivers = run_pipeline(targets, out_dir, overwrite=args.overwrite, merge=args.merge)
     if drivers:
         print_summary(drivers, out_dir)
     else:
